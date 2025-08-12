@@ -1,26 +1,17 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from 'react';
+import { Board } from './components/Board';
 
-function App() {
+export const App: React.FC = () => {
+  // ルーレット開始状態を管理するstate
+  const [isStarted, setIsStarted] = useState(false);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{ padding: '20px' }}>
+      <h1>大臣ビンゴ</h1>
+      {/* Boardに状態とsetterを渡す */}
+      <Board isStarted={isStarted} setIsStarted={setIsStarted} />
     </div>
   );
-}
+};
 
 export default App;
