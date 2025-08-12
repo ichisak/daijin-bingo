@@ -207,15 +207,37 @@ export const Board: React.FC<{ isStarted: boolean; setIsStarted: React.Dispatch<
     let ticks = 0;
     const totalTicks = 60;
 
+    let finalDate: string | null = getRandomDate();
+    setCurrentDate(finalDate);  // ここで確定日付を保持
+
     const spinInterval = setInterval(() => {
       ticks++;
       if (ticks > totalTicks) {
         clearInterval(spinInterval);
         setIsSpinning(false);
-        return;
-      }
-      const nextDate = getRandomDate();
-      setCurrentDate(nextDate);
+        
+        //当たり判定を反映
+        // 確定日付でGET更新
+        setSlots(prevSlots =>
+        prevSlots.map(card => {
+          if (!card) return null;
+          const isHit = finalDate && isDateInRange(finalDate, card.start_date, card.end_date);
+          if (isHit) {
+            return { ...card, isGet: true };
+          }
+          return card;
+        })
+      );
+
+      setCurrentDate(finalDate);  // 最終日付もここでセット（見た目更新用）
+
+      return;
+    }
+    
+    const nextDate = getRandomDate();
+    finalDate = nextDate;   // 最終的な日付をここに格納
+    setCurrentDate(nextDate);
+
     }, 50 + ticks * 10);
   };
 
@@ -291,7 +313,9 @@ export const Board: React.FC<{ isStarted: boolean; setIsStarted: React.Dispatch<
           >
             {slots.map((card, idx) => {
               if (!card) return <Slot key={idx} id={`slot-${idx}`} card={null} />;
-              const getFlag = currentDate && isDateInRange(currentDate, card.start_date, card.end_date);
+              // isGetフラグだけで判定する
+              const getFlag = card.isGet ?? false;
+              
               return <Slot key={idx} id={`slot-${idx}`} card={{ ...card, isGet: getFlag }} />;
             })}
           </div>
