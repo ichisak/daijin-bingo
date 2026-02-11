@@ -625,10 +625,18 @@
   },
   {
     "start_date":"2024-10-02",
-    "end_date":"2025-08-11",
+    "end_date":"2025-10-21",
     "name":"石破茂",
     "image_url":"65_Ishiba_Shigeru.jpg",
     "source_url":"https:\/\/commons.wikimedia.org\/wiki\/File:Ishiba_Shigeru_20241001_(cropped).jpg",
     "credit":"内閣官房内閣広報室, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+    "start_date":"2025-10-22",
+    "end_date":"2099-12-31",
+    "name":"高市早苗",
+    "image_url":"66_Takaichi_Sanae.jpg",
+    "source_url":"https://www.instagram.com/p/DRUKSDzjHrs/",
+    "credit":"外務省／在南アフリカ共和国日本国大使館（内閣広報室）, CC BY 4.0, via Wikimedia Commons"
   }
 ]
