@@ -131,10 +131,11 @@ const DraggableCard: React.FC<{ card: PM }> = ({ card }) => {
 
 //在位日数に応じたポイント計算
 const calculatePoint = (days: number) => {
-  if (days < 100) return 500;   // 100日未満
-  if (days < 300) return 300;   // 300日未満
-  if (days < 1000) return 100;  // 1000日未満
-  return 50;                    // それ以上
+  if (days < 60) return 1000;   // 60日未満
+  if (days < 365) return 500;   // 1年未満
+  if (days < 1095) return 100;  // 3年未満
+  if (days < 1800) return 50;   // 5年未満
+  return 30;                    // それ以上
 };
 
 
