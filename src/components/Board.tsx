@@ -3,6 +3,8 @@ import { DndContext, DragEndEvent, DragOverlay, useDroppable } from '@dnd-kit/co
 import { useDraggable } from '@dnd-kit/core';
 import { Card } from './Card';
 import data from '../data/prime_ministers.json';
+import { stringify } from 'querystring';
+import confetti from 'canvas-confetti';
 
 const imageBasePath = "/images/prime_ministers/";
 
@@ -17,6 +19,8 @@ type PM = {
   image_url: string;
   image: string;
   isGet?: boolean;
+  point?: number;
+  totalDays?: number;
 };
 
 type HistoryItem = {
@@ -27,40 +31,61 @@ type HistoryItem = {
 // --- サブコンポーネント: Slot ---
 const Slot: React.FC<{ id: string; card: PM | null }> = ({ id, card }) => {
   const { isOver, setNodeRef } = useDroppable({ id });
+
   return (
     <div
       ref={setNodeRef}
       style={{
         width: '100%',
         height: '100%',
-        minHeight: 0,
-        minWidth: 0,
-        border: isOver ? '2px solid #4caf50' : '1px dashed #ccc',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: '#f9f9f9',
-        position: 'relative',
+        border: isOver ? '2px solid #4caf50' : '1px dashed #ccc',
         borderRadius: '8px',
-        transition: 'filter 0.5s ease',
+        position: 'relative',
+        boxSizing: 'border-box',
         overflow: 'hidden',
         padding: '2px',
-        boxSizing: 'border-box',
-        filter: (card && card.isGet) ? 'brightness(0.7) sepia(0.5) hue-rotate(-50deg)' : 'none',
       }}
     >
       {card && (
         <>
-        {/* Cardをコンテナいっぱいに広げる */}
-          <div style={{ width: '100%', height: '100%' }}>
-          <Card {...card} />
-          </div>
+          <DraggableCard card={card} />
           {card.isGet && (
             <div style={{
-              position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255, 215, 0, 0.9)',
-              color: '#000', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
-              fontSize: '0.7rem', zIndex: 10, boxShadow: '0 0 4px rgba(0,0,0,0.3)'
-            }}>GET</div>
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '2px',
+              zIndex: 10
+            }}>
+              <div style={{
+                backgroundColor: 'rgba(255, 215, 0, 0.9)',
+                color: '#000',
+                fontWeight: 'bold',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                boxShadow: '0 0 4px rgba(0,0,0,0.3)'
+              }}>
+                GET
+              </div>
+              <div style={{
+                backgroundColor: '#e67e22',
+                color: '#fff',
+                fontWeight: 'bold',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                fontSize: '0.65rem'
+              }}>
+                +{card.point}pt
+              </div>
+            </div>
           )}
         </>
       )}
@@ -86,17 +111,28 @@ const DraggableCard: React.FC<{ card: PM }> = ({ card }) => {
         background: '#fff', 
         boxShadow: '0 2px 5px rgba(0,0,0,0.1)', 
         userSelect: 'none',
-        width: 'calc(100% - 4px)',
-        height: '110px', // 左カラムでのカードの高さを見やすく固定
+        width: '100%',
+        height: '100%', // 左カラムでのカードの高さを見やすく固定
+        minHeight: '110px', //左カラムで潰れないように最低高さを確保
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
+        zIndex: transform ? 999:1, //ドラッグ中に前に出す
       }}
     >
       <Card {...card} />
     </div>
   );
 };
+
+//在位日数に応じたポイント計算
+const calculatePoint = (days: number) => {
+  if (days < 100) return 500;   // 100日未満（超レア：東久邇宮など）
+  if (days < 300) return 300;   // 300日未満（レア：羽田孜など）
+  if (days < 1000) return 100;  // 1000日未満（普通）
+  return 50;                    // それ以上（大御所：安倍、佐藤など）
+};
+
 
 // --- メインコンポーネント: Board ---
 export const Board: React.FC<{ isStarted: boolean; setIsStarted: (v: boolean) => void }> = ({ isStarted, setIsStarted }) => {
@@ -105,15 +141,38 @@ export const Board: React.FC<{ isStarted: boolean; setIsStarted: (v: boolean) =>
   const [isSpinning, setIsSpinning] = useState(false);
   const [activeCard, setActiveCard] = useState<PM | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]); // 履歴用State
+  const [totalScore, setTotalScore] = useState(0);
+  const [isBingo, setIsBingo] = useState(false);
 
   const uniquePrimeMinisters = useMemo(() => {
-    const map = new Map<string, any>();
-    data.forEach((pm) => { if (!map.has(pm.name)) map.set(pm.name, pm); });
-    return Array.from(map.values()).map((pm, i) => ({
-      ...pm,
-      id: i,
-      image: imageBasePath + pm.image_url,
-    }));
+    const pmMap = new Map<string, any>();
+
+    data.forEach((pm) => {
+      //日数計算
+      const start = new Date(pm.start_date).getTime();
+      const end = (pm.end_date === '現職' || !pm.end_date || pm.end_date === '2099-12-31') 
+                ? new Date().getTime() 
+                : new Date(pm.end_date).getTime();
+      const days = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+
+      if (!pmMap.has(pm.name)){
+        pmMap.set(pm.name, {...pm, totalDays: days });
+        }else{
+          //複数回就任している場合は合算
+          const existing = pmMap.get(pm.name);
+          pmMap.set(pm.name, { ...existing, totalDays: existing.totalDays + days });
+        }
+      });
+
+    return Array.from(pmMap.values()).map((pm, i) => {
+      const point = calculatePoint(pm.totalDays);
+      return {
+        ...pm,
+        id: i,
+        image: imageBasePath + pm.image_url,
+        point: point, //カードごとの持ち点
+      };
+    });
   }, []);
 
   const getRandomDate = () => {
@@ -139,21 +198,38 @@ export const Board: React.FC<{ isStarted: boolean; setIsStarted: (v: boolean) =>
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveCard(null);
     if (isStarted) return;
+
     const { active, over } = event;
-    if (!over || !String(over.id).startsWith('slot-')) return;
-    const slotIndex = parseInt(String(over.id).split('-')[1], 10);
-    const draggedCard = active.data.current?.card;
-    if (!draggedCard || slots.some((c, idx) => c?.id === draggedCard.id && idx !== slotIndex)) return;
+    const draggedCard = active.data.current?.card as PM;
+    if (!draggedCard) return;
 
-    setSlots(prev => {
-      const next = [...prev];
+    //1.一覧に戻す
+    if (!over){
+      setSlots(prev => prev.map(c => c?.id === draggedCard.id ? null : c));
+      return;
+    }
+
+    //2.盤面へのドロップ
+    if (String(over.id).startsWith('slot-')){
+      const slotIndex = parseInt(String(over.id).split('-')[1], 10);
+      
+      setSlots(prev => {
+      const next: (PM | null)[] = [...prev];
       const existingIdx = prev.findIndex(c => c?.id === draggedCard.id);
-      if (existingIdx >= 0) next[existingIdx] = next[slotIndex];
-      next[slotIndex] = draggedCard;
+      
+      if (existingIdx >= 0) {
+        // 盤面内移動：入れ替え
+        const targetCard = next[slotIndex];
+        next[existingIdx] = targetCard;
+        next[slotIndex] = draggedCard;
+      }else{
+        //新規配置
+        next[slotIndex] = draggedCard;
+      }
       return next;
-    });
-  };
-
+    })
+  }
+};
   const randomPlacement = () => {
     if (isStarted) return;
     setSlots([...uniquePrimeMinisters].sort(() => Math.random() - 0.5).slice(0, 25));
@@ -198,9 +274,28 @@ export const Board: React.FC<{ isStarted: boolean; setIsStarted: (v: boolean) =>
             if (!card || card.isGet) return card;
             // 盤面のカード名が、今回の「当たり名前リスト」に含まれているか判定
             const isHit = hitNames.includes(card.name);
-            return isHit ? { ...card, isGet: true } : card;
+
+            if (isHit){
+              setTotalScore(s => s + (card.point || 0));
+              return { ...card, isGet: true};
+            }
+            return card;
           });
-          if (checkBingo(next)) setTimeout(() => alert("🎉 BINGO!"), 300);
+          //ビンゴ判定
+          if (checkBingo(next)) {
+            //紙吹雪実行
+              confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: {y: 0.6},
+                zIndex: 10000
+              });
+            
+            setTimeout(() => {
+              setIsBingo(true);
+            },500);
+          }
+
           return next;
         });
       }
@@ -296,6 +391,7 @@ return (
               maxWidth: 'calc(100vh - 120px)',
               display: 'grid', 
               gridTemplateColumns: 'repeat(5, 1fr)',
+              gridTemplateRows: 'repeat(5, 1fr)',
               gap: '8px', 
               background: '#ddd', 
               padding: '10px', 
@@ -372,6 +468,45 @@ return (
             <div style={{ width: '100px', opacity: 0.8 }}><Card {...activeCard} /></div>
           ) : null}
         </DragOverlay>
+
+        {/* ビンゴ演出オーバーレイ */}
+        {isBingo && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          animation: 'fadeIn 0.5s ease-out'
+          }}>
+          <h1 style={{
+          fontSize: '6rem', color: '#ffcc00', margin: 0,
+          textShadow: '0 0 20px #fff, 0 0 40px #ffcc00',
+          animation: 'bounce 1s infinite'
+          }}>
+            🎉 BINGO! 🎉
+          </h1>
+          <div style={{ color: '#fff', fontSize: '2rem', marginTop: '20px' }}>
+            最終スコア: <span style={{ fontSize: '3rem', color: '#ff4757' }}>{totalScore}</span> pt
+          </div>
+          <button 
+            onClick={() => window.location.reload()} // 簡単なリセット方法
+            style={{
+              marginTop: '40px', padding: '15px 40px', fontSize: '1.5rem',
+              backgroundColor: '#4CAF50', color: 'white', border: 'none',
+              borderRadius: '50px', cursor: 'pointer', fontWeight: 'bold'
+            }}
+          >
+            もう一度遊ぶ
+          </button>
+        </div>
+        )}
+        {/* アニメーション用のStyleタグ */}
+        <style>{`
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-20px) scale(1.1); }
+          }
+        `}</style>
       </DndContext>
     </div>
   );
