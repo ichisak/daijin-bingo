@@ -29,7 +29,11 @@ type HistoryItem = {
 };
 
 // --- サブコンポーネント: Slot ---
-const Slot: React.FC<{ id: string; card: PM | null }> = ({ id, card }) => {
+const Slot: React.FC<{
+    id: string; 
+    card: PM | null;
+    isReach?: boolean;
+}> = ({ id, card }) => {
   const { isOver, setNodeRef } = useDroppable({ id });
 
   return (
@@ -139,11 +143,12 @@ export const SoloBingo: React.FC = () =>{
     //内部で管理するように移動
     const[isStarted, setIsStarted ] = useState(false);
     const [slots, setSlots] = useState<(PM | null)[]>(Array(25).fill(null));
-    const [currentDate, setCurrentDate] = useState<string | null>(null);
+    const [currentDate, setCurrentDate] = useState<string>("1885-12-22");
     const [isSpinning, setIsSpinning] = useState(false);
     const [activeCard, setActiveCard] = useState<PM | null>(null);
     const [history, setHistory] = useState<HistoryItem[]>([]); // 履歴用State
     const [isBingo, setIsBingo] = useState(false);
+    
     const [showConfirm, setShowConfirm] = useState(false);
     const getWinningIndices = (currentSlots: (PM | null)[]) => {
         const lines = [
@@ -170,6 +175,25 @@ export const SoloBingo: React.FC = () =>{
         return score;
     }, [slots]);
 
+    // slotsからリーチ状態のインデックスを計算
+    const reachIndices = useMemo(() => {
+        const lines = [
+            [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
+            [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
+            [0,6,12,18,24],[4,8,12,16,20]
+        ];
+        const indices = new Set<number>();
+        lines.forEach(line => {
+            const getCount = line.filter(idx => slots[idx]?.isGet).length;
+            // 5マス中4マスが埋まっていたら、残りの1マス(まだGETしてないマス)をリーチとする
+            if (getCount === 4) {
+                line.forEach(idx => {
+                    if (slots[idx] && !slots[idx]?.isGet) indices.add(idx);
+                });
+            }
+        });
+        return indices;
+    }, [slots]);
 
     const uniquePrimeMinisters = useMemo(() => {
         const pmMap = new Map<string, any>();
@@ -262,88 +286,85 @@ export const SoloBingo: React.FC = () =>{
             setSlots([...uniquePrimeMinisters].sort(() => Math.random() - 0.5).slice(0, 25));
     };
 
-    const checkBingo = (currentSlots: (PM | null)[]) => {
-        const lines = [
-        [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
-        [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
-        [0,6,12,18,24],[4,8,12,16,20]
-        ];
-        return lines.some(line => line.every(idx => currentSlots[idx]?.isGet));
-    };
+    const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const startRoulette = () => {
         if (isSpinning) return;
         setIsSpinning(true);
-        let ticks = 0;
 
-        const spinInterval = setInterval(() => {
-            const tempDate = getRandomDate();
-            setCurrentDate(tempDate);
-        
-            if (++ticks > 30) {
-                clearInterval(spinInterval);
-                setIsSpinning(false);
+        const startDate = new Date('1885-12-22').getTime();
+        const endDate = new Date().getTime();
+        const oneDay = 24 * 60 * 60 * 1000;
 
-                const finalDate = tempDate;  //確定した日付
-                setCurrentDate(finalDate);
-            
-                // 1.該当する総理の名前を特定（履歴用）
-                const hitNames = Array.from(new Set(
-                    data.filter((pm: any) => isDateInRange(finalDate, pm.start_date, pm.end_date))
-                        .map((pm: any) => pm.name)
-                ));
+        // 1回の更新で進める日数
+        const daysPerTick = 150;
 
-                // 2.履歴更新(SetSlotsの外で実行して２重登録を防止)
-                setHistory(prev => [{ date: finalDate, names: hitNames.length ? hitNames : ["該当なし"] }, ...prev]);
+        timerRef.current = setInterval(() => {
+            setCurrentDate((prev) => {
+            const currentTs = new Date(prev || '1885-12-22').getTime();
+            let nextTs = currentTs + (oneDay * daysPerTick);
 
-                // 3.盤面のスロット更新
-                setSlots(prev => {
-                    // まずカードが当たったかどうかのフラグを更新    
-                    const next = prev.map(card => {
-                        if (!card || card.isGet) return card;
-                        return hitNames.includes(card.name) ? { ...card, isGet: true } : card;
-                    });
+            // 今日を過ぎたら明治に戻る
+            if (nextTs > endDate) {
+                nextTs = startDate;
+            }
 
-                //ビンゴしている列（インデックス）をすべて特定する
-                const lines = [
-                    [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24], // 横
-                    [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24], // 縦
-                    [0,6,12,18,24],[4,8,12,16,20] // 斜め
-                ];
-
-                const winningIndices = new Set<number>();
-                lines.forEach(line => {
-                // その列の5枚すべてが isGet かどうか
-                    if (line.every(idx => next[idx]?.isGet)) {
-                        line.forEach(idx => winningIndices.add(idx)); // ビンゴしたマスの番号を記録
-                    }
-                });
-
-                // 3. ビンゴしたマス（winningIndices）に含まれるカードの点数だけを合計する
-                let newTotalScore = 0;
-                winningIndices.forEach(idx => {
-                    newTotalScore += next[idx]?.point || 0;
-                });
+            return new Date(nextTs).toISOString().slice(0, 10);
+            });
+        }, 30); // 30msごとに更新
+        };
 
 
-                // 4. ビンゴ判定と演出
-                if (winningIndices.size > 0) {
-                    confetti({
-                        particleCount: 150,
-                        spread: 70,
-                        origin: { y: 0.6 },
-                        zIndex: 10000
-                    });
+        const stopRoulette = () => {
+        if (!isSpinning || !timerRef.current) return;
 
-                    setTimeout(() => {
-                        setIsBingo(true);
-                    }, 500);
-                }
+        // タイマーを止める
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        setIsSpinning(false);
+
+        // 現在表示されている日付で当たり判定を実行
+            if (currentDate) {
+            processHit(currentDate);
+            }
+        };
+
+    const processHit = (finalDate: string) => {
+        // 1. 該当する総理の名前を特定
+        const hitNames = Array.from(new Set(
+            data.filter((pm: any) => isDateInRange(finalDate, pm.start_date, pm.end_date))
+                .map((pm: any) => pm.name)
+        ));
+
+        // 2. 履歴更新
+        setHistory(prev => [{ 
+            date: finalDate, 
+            names: hitNames.length ? hitNames : ["該当なし"] 
+        }, ...prev]);
+
+        // 3. 盤面更新とビンゴ判定
+        setSlots(prev => {
+            const next = prev.map(card => {
+            if (!card || card.isGet) return card;
+            return hitNames.includes(card.name) ? { ...card, isGet: true } : card;
+            });
+
+            // ビンゴしているラインを特定
+            const winningIndices = getWinningIndices(next);
+
+            // ビンゴ演出
+            if (winningIndices.size > 0) {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                zIndex: 10000
+            });
+            setTimeout(() => setIsBingo(true), 500);
+            }
             return next;
-          });
-        }
-    }, 60);
-};
+        });
+    };
     
         // デバッグ用：強制ビンゴ関数
         const debugBingo = () => {
@@ -360,7 +381,7 @@ export const SoloBingo: React.FC = () =>{
             });
 
             // ビンゴ判定をキックして演出を出す
-            if (checkBingo(next)) {
+            if (getWinningIndices(next)) {
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             setTimeout(() => setIsBingo(true), 500);
             }
@@ -516,7 +537,15 @@ return (
               boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
               boxSizing: 'border-box'
             }}>
-              {slots.map((card, idx) => <Slot key={idx} id={`slot-${idx}`} card={card} />)}
+              {slots.map((card, idx) => (
+                <Slot 
+                    key={idx} 
+                    id={`slot-${idx}`} 
+                    card={card} 
+                    isReach={reachIndices.has(idx)} // Propsとして追加
+                />
+                ))}
+
             </div>
           </div>
 
@@ -540,13 +569,20 @@ return (
                   background: '#fff', 
                   textAlign: 'center'
                 }}>
-                  <h3 style={{ margin: '0 0 8px', fontSize: '0.9rem' }}>ルーレット</h3>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '0.9rem' }}>日付スロット</h3>
                   <div style={{ fontSize: '1.2rem', padding: '10px', background: '#f0f0f0', borderRadius: '6px', fontWeight: 'bold' }}>
                     {currentDate || "----/--/--"}
                   </div>
-                  <button onClick={startRoulette} disabled={isSpinning} style={{ width: '100%', marginTop: '12px', padding: '10px', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>
-                    {isSpinning ? '回転中...' : '回す'}
-                  </button>
+                  <button 
+                        onClick={isSpinning ? stopRoulette : startRoulette} 
+                        style={{ 
+                            width: '100%', marginTop: '12px', padding: '10px', cursor: 'pointer', 
+                            backgroundColor: isSpinning ? '#f44336' : '#4CAF50', // 回転中は赤
+                            color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' 
+                        }}
+                        >
+                        {isSpinning ? 'ストップ！' : 'ルーレットを回す'}
+                    </button>
                 </div>
 
                 {/* 履歴エリア (残りの高さを埋めてスクロール) */}
