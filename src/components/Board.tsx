@@ -484,9 +484,61 @@ return (
           }}>
             🎉 BINGO! 🎉
           </h1>
-          <div style={{ color: '#fff', fontSize: '2rem', marginTop: '20px' }}>
-            最終スコア: <span style={{ fontSize: '3rem', color: '#ff4757' }}>{totalScore}</span> pt
+
+          {/* スコア計算の内訳エリア */}
+          <div style={{
+            background: 'rgba(255,255,255,0.1)', borderRadius: '15px',
+            padding: '20px', width: '100%', maxWidth: '600px',
+            maxHeight: '40vh', overflowY: 'auto', marginBottom: '20px',
+            border: '1px solid rgba(255,255,255,0.2)'
+            }}>
           </div>
+            <h3 style={{ 
+              color: '#fff', 
+              borderBottom: '1px solid #555', 
+              paddingBottom: '10px', 
+              marginTop: 0 
+              }}>
+                得点内訳
+              </h3>
+              {slots.filter(s => s?.isGet).map((card, i) => (
+              <div key={i} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                color: '#ddd', 
+                padding: '8px 0', 
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                fontSize: '1.1rem'
+              }}>
+              <span>{card?.name} 
+                <small style={{ 
+                  fontSize: '0.7rem', 
+                  color: '#888' 
+                  }}>
+                    ({card?.totalDays}日間)
+                  </small>
+                </span>
+              <span style={{
+                 fontWeight: 'bold', 
+                 color: '#ffcc00' 
+                 }}>
+                  +{card?.point} pt
+              </span>
+            </div>
+          ))}
+          {/* ビンゴボーナスなどがあればここに追加 */}
+          <div style={{ 
+            display: 'flex',
+            justifyContent: 'space-between',
+            color: '#ff4757',
+            padding: '15px 0 5px', 
+            fontWeight: 'bold', 
+            fontSize: '1.2rem'
+            }}>
+            <span>合計スコア</span>
+            <span>{totalScore} pt</span>
+          </div>
+
           <button 
             onClick={() => window.location.reload()} // 簡単なリセット方法
             style={{
