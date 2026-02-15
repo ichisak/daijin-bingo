@@ -24,7 +24,7 @@ export const App: React.FC = () => {
         </h1>
         
         <div style={{ display: 'grid', gap: '20px', width: '300px' }}>
-          <MenuButton onClick={() => setMode('solo-bingo')} label="ソロ用ビンゴ" sub="知識で高得点を狙え！" color="#4CAF50" />
+          <MenuButton onClick={() => setMode('solo-bingo')} label="一人で遊ぶビンゴ" sub="知識で高得点を狙え！" color="#4CAF50" />
           <MenuButton onClick={() => setMode('vs-bingo')} label="2人対戦ビンゴ" sub="カードを奪い合え！" color="#2196F3" />
           <MenuButton onClick={() => setMode('timeline')} label="並べ替えゲーム" sub="歴史の順序を当てろ！" color="#FF9800" />
         </div>

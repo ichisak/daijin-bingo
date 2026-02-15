@@ -131,10 +131,10 @@ const DraggableCard: React.FC<{ card: PM }> = ({ card }) => {
 
 //在位日数に応じたポイント計算
 const calculatePoint = (days: number) => {
-  if (days < 100) return 500;   // 100日未満（超レア：東久邇宮など）
-  if (days < 300) return 300;   // 300日未満（レア：羽田孜など）
-  if (days < 1000) return 100;  // 1000日未満（普通）
-  return 50;                    // それ以上（大御所：安倍、佐藤など）
+  if (days < 100) return 500;   // 100日未満
+  if (days < 300) return 300;   // 300日未満
+  if (days < 1000) return 100;  // 1000日未満
+  return 50;                    // それ以上
 };
 
 
@@ -297,7 +297,7 @@ export const SoloBingo: React.FC = () =>{
         const oneDay = 24 * 60 * 60 * 1000;
 
         // 1回の更新で進める日数
-        const daysPerTick = 150;
+        const daysPerTick = 500;
 
         timerRef.current = setInterval(() => {
             setCurrentDate((prev) => {
@@ -311,7 +311,7 @@ export const SoloBingo: React.FC = () =>{
 
             return new Date(nextTs).toISOString().slice(0, 10);
             });
-        }, 30); // 30msごとに更新
+        }, 20); // 30msごとに更新
         };
 
 
@@ -549,7 +549,7 @@ return (
             </div>
           </div>
 
-          {/* 4. 右カラム: ルーレット & 履歴 */}
+          {/* 4. 右カラム: スロット & 履歴 */}
           <div style={{
             height: '100%', 
             display: 'flex', 
@@ -560,7 +560,7 @@ return (
           }}>
             {isStarted ? (
               <>
-                {/* ルーレット部分 (高さ固定) */}
+                {/* スロット部分 (高さ固定) */}
                 <div style={{ 
                   flexShrink: 0,
                   border: '2px solid #333', 
@@ -581,7 +581,7 @@ return (
                             color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' 
                         }}
                         >
-                        {isSpinning ? 'ストップ！' : 'ルーレットを回す'}
+                        {isSpinning ? 'ストップ！' : 'スロットを回す'}
                     </button>
                 </div>
 
@@ -609,7 +609,7 @@ return (
               </>
             ) : (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', border: '2px dashed #ccc', borderRadius: '12px', textAlign: 'center', padding: '20px' }}>
-                配置を確定すると<br/>ルーレットが起動します
+                配置を確定すると<br/>日付スロットが起動します
               </div>
             )}
           </div>
